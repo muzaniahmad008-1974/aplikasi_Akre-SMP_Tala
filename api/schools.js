@@ -1,0 +1,151 @@
+import { Redis } from '@upstash/redis';
+
+// Vercel tidak lagi punya "Vercel KV" bawaan (dipensiunkan akhir 2024). Cara
+// resmi sekarang: pasang integrasi "Upstash for Redis" lewat Vercel Marketplace
+// (tab Storage di dashboard proyek Anda) — ini otomatis menyuntikkan env var
+// KV_REST_API_URL & KV_REST_API_TOKEN ke proyek. Bila Anda membuat akun Upstash
+// sendiri secara terpisah (tanpa lewat Marketplace Vercel), env var-nya
+// biasanya bernama UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN — kode di
+// bawah ini menerima kedua kemungkinan penamaan tersebut.
+function getRedis() {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) {
+    const err = new Error('Database Redis (Upstash) belum terkonfigurasi di server ini. Pasang integrasi "Upstash for Redis" lewat tab Storage di dashboard Vercel — lihat README bagian Troubleshooting.');
+    err.code = 'REDIS_NOT_CONFIGURED';
+    throw err;
+  }
+  return new Redis({ url, token });
+}
+
+const SCHOOL_SEED = [
+  { id: 's1', name: 'SMPN 1 Jorong', npsn: '', kepsek: '', code: '1001' },
+  { id: 's2', name: 'SMPN 1 Kintap', npsn: '', kepsek: '', code: '1002' },
+  { id: 's3', name: 'SMPN 3 Panyipatan', npsn: '', kepsek: '', code: '1003' },
+  { id: 's4', name: 'SMPN 1 Tambang Ulang', npsn: '', kepsek: '', code: '1004' },
+  { id: 's5', name: 'SMPN 4 Bajuin', npsn: '', kepsek: '', code: '1005' },
+  { id: 's6', name: 'SMPN 4 Pelaihari', npsn: '', kepsek: '', code: '1006' },
+  { id: 's7', name: 'SMPN 5 Pelaihari', npsn: '', kepsek: '', code: '1007' },
+  { id: 's8', name: 'SMPS IT Sirajul Huda', npsn: '', kepsek: '', code: '1008' },
+  { id: 's9', name: 'SMPS Muhammadiyah', npsn: '', kepsek: '', code: '1009' },
+  { id: 's10', name: 'SMP Tahfizh Bilingual Daarul Qur\u2019an Istiqomah', npsn: '', kepsek: '', code: '1010' },
+];
+
+const ADMIN_CODE = process.env.ADMIN_CODE || 'akreditasi2026';
+
+function normalize(v) {
+  return (v || '').toString().trim();
+}
+function checkAdminCode(input) {
+  return normalize(input) === normalize(ADMIN_CODE);
+}
+
+function parseBody(req) {
+  if (!req.body) return {};
+  if (typeof req.body === 'string') {
+    try { return JSON.parse(req.body); } catch (e) { return {}; }
+  }
+  return req.body;
+}
+
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    const body = parseBody(req);
+    const ok = checkAdminCode(body.adminCode);
+    const usingDefault = normalize(ADMIN_CODE) === 'akreditasi2026';
+    return res.status(ok ? 200 : 403).json({
+      ok,
+      usingDefault,
+      providedLength: normalize(body.adminCode).length,
+      expectedLength: normalize(ADMIN_CODE).length,
+    });
+  }
+
+  let redis;
+  try {
+    redis = getRedis();
+  } catch (e) {
+    return res.status(500).json({ error: e.message, code: e.code || 'REDIS_NOT_CONFIGURED' });
+  }
+
+  if (req.method === 'GET') {
+    let list;
+    try {
+      list = await redis.get('schools:list');
+    } catch (e) {
+      return res.status(500).json({ error: 'Gagal membaca database Redis.', code: 'REDIS_NOT_CONFIGURED' });
+    }
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      list = SCHOOL_SEED;
+      await redis.set('schools:list', list);
+    }
+    return res.status(200).json(list);
+  }
+
+  if (req.method === 'PUT') {
+    const body = parseBody(req);
+    const { id, patch, adminCode, newSchool } = body;
+    if (!checkAdminCode(adminCode)) return res.status(403).json({ error: 'Kode admin salah.' });
+
+    let list;
+    try {
+      list = await redis.get('schools:list');
+    } catch (e) {
+      return res.status(500).json({ error: 'Gagal membaca database Redis.', code: 'REDIS_NOT_CONFIGURED' });
+    }
+    if (!list) list = SCHOOL_SEED;
+
+    if (newSchool) {
+      if (!newSchool.name || !newSchool.name.trim()) return res.status(400).json({ error: 'Nama sekolah wajib diisi.' });
+      if (!newSchool.code || !newSchool.code.trim()) return res.status(400).json({ error: 'Kode akses wajib diisi.' });
+      if (list.some((s) => s.code === newSchool.code)) return res.status(409).json({ error: 'Kode akses ini sudah dipakai sekolah lain.' });
+      const created = {
+        id: 's' + Date.now(),
+        name: newSchool.name.trim(),
+        npsn: (newSchool.npsn || '').trim(),
+        kepsek: (newSchool.kepsek || '').trim(),
+        code: newSchool.code.trim(),
+      };
+      list.push(created);
+      await redis.set('schools:list', list);
+      return res.status(200).json({ school: created, list });
+    }
+
+    if (!id || !patch) return res.status(400).json({ error: 'id dan patch wajib diisi' });
+    const idx = list.findIndex((s) => s.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Sekolah tidak ditemukan' });
+    list[idx] = { ...list[idx], ...patch };
+    await redis.set('schools:list', list);
+    return res.status(200).json(list[idx]);
+  }
+
+  if (req.method === 'DELETE') {
+    const body = parseBody(req);
+    const id = (req.query && req.query.id) || body.id;
+    const adminCode = (req.headers && (req.headers['x-admin-code'] || req.headers['X-Admin-Code'])) || body.adminCode;
+    if (!checkAdminCode(adminCode)) return res.status(403).json({ error: 'Kode admin salah.' });
+    if (!id) return res.status(400).json({ error: 'id wajib diisi' });
+
+    let list;
+    try {
+      list = await redis.get('schools:list');
+    } catch (e) {
+      return res.status(500).json({ error: 'Gagal membaca database Redis.', code: 'REDIS_NOT_CONFIGURED' });
+    }
+    if (!list) list = SCHOOL_SEED;
+    if (list.length <= 1) return res.status(400).json({ error: 'Tidak bisa menghapus — minimal harus ada 1 sekolah binaan tersisa.' });
+
+    const idx = list.findIndex((s) => s.id === id);
+    if (idx === -1) return res.status(404).json({ error: 'Sekolah tidak ditemukan' });
+    const removed = list.splice(idx, 1)[0];
+    await redis.set('schools:list', list);
+
+    try {
+      await redis.del('evidence:' + id);
+    } catch (e) { /* diabaikan — penghapusan sekolah tetap berhasil */ }
+
+    return res.status(200).json({ removed, list });
+  }
+
+  return res.status(405).json({ error: 'Metode tidak didukung' });
+}
