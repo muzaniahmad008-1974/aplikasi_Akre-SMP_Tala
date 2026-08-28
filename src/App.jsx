@@ -1019,7 +1019,7 @@ function BerandaView({ schools, evidenceMap, onSelectSchool, isAdmin, onOpenAddS
       <div className="mb-5 flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="font-serif font-bold text-3xl text-[#1C2530]">Beranda</h2>
-          <p className="text-base text-slate-900 font-semibold mt-0.5">Ringkasan kelengkapan bukti dukung akreditasi \u2014 {schools.length} sekolah binaan.</p>
+          <p className="text-base text-slate-900 font-semibold mt-0.5">Ringkasan kelengkapan bukti dukung akreditasi — {schools.length} sekolah binaan.</p>
         </div>
         {isAdmin && (
           <button
@@ -1038,11 +1038,11 @@ function BerandaView({ schools, evidenceMap, onSelectSchool, isAdmin, onOpenAddS
         </div>
         <div className="rounded-2xl bg-white border border-slate-400 p-4">
           <p className="text-sm uppercase tracking-wide text-slate-600">Sangat Baik</p>
-          <p className="font-serif font-extrabold text-5xl mt-1 text-[#0F6B5C]">{sangatBaik}<span className="text-lg text-slate-700 font-sans font-bold"> /10</span></p>
+          <p className="font-serif font-extrabold text-5xl mt-1 text-[#0F6B5C]">{sangatBaik}<span className="text-lg text-slate-700 font-sans font-bold"> /{schools.length}</span></p>
         </div>
         <div className="rounded-2xl bg-white border border-slate-400 p-4">
           <p className="text-sm uppercase tracking-wide text-slate-600">Belum Mulai</p>
-          <p className="font-serif font-extrabold text-5xl mt-1 text-rose-500">{belumMulai}<span className="text-lg text-slate-700 font-sans font-bold"> /10</span></p>
+          <p className="font-serif font-extrabold text-5xl mt-1 text-rose-500">{belumMulai}<span className="text-lg text-slate-700 font-sans font-bold"> /{schools.length}</span></p>
         </div>
       </div>
 
@@ -1487,7 +1487,7 @@ export default function AkreditasiApp() {
               {isAdmin && (
                 <div className="mt-4 rounded-xl bg-[#0F6B5C]/10 p-3 text-sm text-[#0F6B5C] flex items-start gap-1.5">
                   <ShieldCheck size={14} className="shrink-0 mt-0.5" />
-                  <span>Mode Pengawas aktif \u2014 Anda dapat menyunting data sekolah & mereset bukti dukung.</span>
+                  <span>Mode Pengawas aktif — Anda dapat menyunting data sekolah & mereset bukti dukung.</span>
                 </div>
               )}
               <button onClick={handleKeluar} className="mt-4 flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-sm font-bold text-rose-600 hover:bg-rose-50 w-full">
