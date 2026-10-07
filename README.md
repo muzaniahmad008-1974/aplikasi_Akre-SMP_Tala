@@ -1,4 +1,4 @@
-# Bukti Dukung Akreditasi SMP 2026 — Versi Vercel
+# RAPI-AKRE (Bukti Dukung Akreditasi SMP) - Versi Vercel
 
 Aplikasi web database bukti dukung akreditasi untuk Pengawas Sekolah, Kepala Sekolah, dan
 Guru — mengelola skor mandiri, bukti tersedia/perlu dilengkapi, dan catatan untuk **59

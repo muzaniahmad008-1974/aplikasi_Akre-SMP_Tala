@@ -180,7 +180,7 @@ function buildReportHTML(school, evidence) {
 </head>
 <body>
   <div class="header">
-    <h1>Laporan Rekap Bukti Dukung Akreditasi SMP 2026</h1>
+    <h1>Laporan Rekap Bukti Dukung Akreditasi SMP</h1>
     <p class="meta"><strong>${escapeHtml(school.name)}</strong></p>
     <p class="meta">NPSN: ${escapeHtml(school.npsn) || '-'} &middot; Kepala Sekolah: ${escapeHtml(school.kepsek) || '-'}</p>
     <p class="meta">Diunduh pada: ${tanggal}</p>
@@ -196,7 +196,7 @@ function buildReportHTML(school, evidence) {
   ${bagianSections}
 
   <div class="footer">
-    Dihasilkan otomatis oleh Aplikasi Bukti Dukung Akreditasi SMP 2026 &middot; Kab. Tanah Laut. Data mengikuti kondisi terakhir pada saat laporan ini diunduh.
+    Dihasilkan otomatis oleh Aplikasi RAPI-AKRE (Bukti Dukung Akreditasi SMP) &middot; Kab. Tanah Laut. Data mengikuti kondisi terakhir pada saat laporan ini diunduh.
   </div>
 </body>
 </html>`;
@@ -250,7 +250,7 @@ async function buildReportDocx(school, evidence) {
   const katTotal = CATEGORY(pctTotal);
 
   const children = [];
-  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [new TextRun({ text: 'LAPORAN REKAP BUKTI DUKUNG AKREDITASI SMP 2026', bold: true, size: 32, color: '1F3864' })] }));
+  children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 100 }, children: [new TextRun({ text: 'LAPORAN REKAP BUKTI DUKUNG AKREDITASI SMP', bold: true, size: 32, color: '1F3864' })] }));
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: school.name, bold: true, size: 24 })] }));
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [new TextRun({ text: `NPSN: ${school.npsn || '-'}  \u00b7  Kepala Sekolah: ${school.kepsek || '-'}`, size: 20 })] }));
   children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 240 }, children: [new TextRun({ text: `Diunduh pada: ${tanggal}`, italics: true, size: 18, color: '666666' })] }));
@@ -310,7 +310,7 @@ function buildReportPdf(school, evidence) {
   docPdf.setFont('helvetica', 'bold');
   docPdf.setFontSize(16);
   docPdf.setTextColor(31, 56, 100);
-  docPdf.text('LAPORAN REKAP BUKTI DUKUNG AKREDITASI SMP 2026', pageWidth / 2, 40, { align: 'center' });
+  docPdf.text('LAPORAN REKAP BUKTI DUKUNG AKREDITASI SMP', pageWidth / 2, 40, { align: 'center' });
   docPdf.setFontSize(12);
   docPdf.text(school.name, pageWidth / 2, 60, { align: 'center' });
   docPdf.setFont('helvetica', 'normal');
@@ -560,8 +560,9 @@ function RoleGateScreen({ schools, onLogin, error, checking }) {
           <div className="w-14 h-14 rounded-2xl bg-[#1F3864] flex items-center justify-center mx-auto mb-3 shadow-lg">
             <ClipboardList size={26} className="text-white" />
           </div>
-          <h1 className="font-serif font-extrabold text-2xl text-slate-900">Bukti Dukung Akreditasi</h1>
-          <p className="text-sm text-slate-800 font-semibold">SMP 2026 &middot; Kab. Tanah Laut</p>
+          <h1 className="font-serif font-extrabold text-2xl text-slate-900">RAPI-AKRE</h1>
+          <p className="text-sm text-[#1F3864] font-bold">Rekam, Analisis, Pantau, Integrasikan Bukti Akreditasi</p>
+          <p className="text-sm text-slate-800 font-semibold">Bukti Dukung Akreditasi SMP &middot; Kab. Tanah Laut</p>
         </div>
 
         <div className="bg-white/60 backdrop-blur rounded-3xl p-4">
@@ -1436,8 +1437,8 @@ export default function AkreditasiApp() {
               <ClipboardList size={18} className="text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-serif font-bold text-lg text-[#1C2530] leading-tight truncate">Bukti Dukung Akreditasi</p>
-              <p className="text-xs text-slate-600 leading-tight">{isLocked ? `${ROLE_LABEL[myRole]} \u00b7 ${selectedSchool?.name || ''}` : 'SMP 2026 \u00b7 Kab. Tanah Laut'}</p>
+              <p className="font-serif font-bold text-lg text-[#1C2530] leading-tight truncate">RAPI-AKRE</p>
+              <p className="text-xs text-slate-600 leading-tight">{isLocked ? `${ROLE_LABEL[myRole]} \u00b7 ${selectedSchool?.name || ''}` : 'Bukti Dukung Akreditasi SMP \u00b7 Kab. Tanah Laut'}</p>
             </div>
           </div>
           {isLocked ? (
