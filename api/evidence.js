@@ -30,7 +30,7 @@ function emptyEvidence() {
   for (const k of ['kp', 'kk', 'il']) {
     INDICATOR_DATA[k].butir.forEach((b) =>
       b.items.forEach((it) => {
-        ev[it.code] = { skor: 0, buktiTersedia: '', buktiPerlu: '', lokasi: '', catatan: '', updatedAt: null };
+        ev[it.code] = { skor: 0, buktiPilih: null, buktiTersedia: '', buktiPerlu: '', lokasi: '', catatan: '', updatedAt: null };
       })
     );
   }

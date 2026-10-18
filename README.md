@@ -118,6 +118,16 @@ cukup Anda dan pihak yang Anda percaya yang tahu.
   untuk mengunci sementara akses ubah/reset/hapus tanpa keluar dari peran Pengawas; tombol
   **Keluar** terpisah untuk benar-benar keluar ke layar pilih peran.
 
+### Pilihan Bukti pada Setiap Indikator
+
+Kolom **Bukti yang Sudah Tersedia** punya dropdown centang. Pilihannya dibentuk dari panduan
+indikator itu sendiri: telaah dokumen, wawancara, observasi, dan tindakan yang perlu dilakukan.
+Centang bukti yang sudah dimiliki sekolah. Kolom **Bukti yang Perlu Dilengkapi** terisi otomatis
+dengan pilihan yang **belum dicentang**, dan ikut berubah saat centang diubah. Tersedia juga isian
+teks bebas pada kedua kolom untuk bukti di luar daftar. Hasilnya ikut tercetak pada laporan Word,
+PDF, dan HTML. Indikator yang dropdown-nya belum dipakai tidak menampilkan daftar otomatis, supaya
+data lama tidak salah terbaca sebagai bukti yang kurang.
+
 ### Kode Akses Sekolah (default)
 
 | Sekolah | Kode Default |

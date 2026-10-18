@@ -55,11 +55,60 @@ function emptyEvidence() {
   const ev = {};
   for (const k of ['kp', 'kk', 'il']) {
     INDICATOR_DATA[k].butir.forEach(b => b.items.forEach(it => {
-      ev[it.code] = { skor: 0, buktiTersedia: '', buktiPerlu: '', lokasi: '', catatan: '', updatedAt: null };
+      ev[it.code] = { skor: 0, buktiPilih: null, buktiTersedia: '', buktiPerlu: '', lokasi: '', catatan: '', updatedAt: null };
     }));
   }
   return ev;
 }
+
+/* =========================================================================
+   PILIHAN BUKTI BERDASARKAN PANDUAN
+   Daftar pilihan dibentuk dari panduan tiap indikator: telaah dokumen,
+   wawancara, observasi, dan tindakan. "Bukti yang Perlu Dilengkapi" terisi
+   otomatis dari pilihan yang belum dicentang pada "Bukti yang Sudah Tersedia".
+   buktiPilih: null = dropdown belum dipakai; larik = bukti yang dicentang.
+   ========================================================================= */
+function splitTopLevel(str, sep) {
+  const out = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of String(str || '')) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === sep && depth === 0) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map((t) => t.trim().replace(/[.;]+$/, '')).filter(Boolean);
+}
+const _opsiCache = {};
+function getEvidenceOptions(item) {
+  if (_opsiCache[item.code]) return _opsiCache[item.code];
+  const opts = [];
+  const add = (group, text) => { if (text && !opts.some((o) => o.text === text)) opts.push({ group, text }); };
+  splitTopLevel(item.telaah, ';').forEach((t) => add('Telaah dokumen', t));
+  if (item.wawancara) add('Wawancara', 'Hasil wawancara: ' + item.wawancara);
+  if (item.observasi) add('Observasi', 'Hasil observasi: ' + item.observasi);
+  (item.tindakan || []).forEach((t) => add('Bukti pelaksanaan tindakan', 'Dokumentasi pelaksanaan: ' + t));
+  _opsiCache[item.code] = opts;
+  return opts;
+}
+function getBuktiTersediaPilih(item, d) {
+  if (!Array.isArray(d?.buktiPilih)) return [];
+  const valid = getEvidenceOptions(item).map((o) => o.text);
+  return valid.filter((t) => d.buktiPilih.includes(t));
+}
+function getBuktiPerluAuto(item, d) {
+  if (!Array.isArray(d?.buktiPilih)) return [];
+  const dipilih = getBuktiTersediaPilih(item, d);
+  return getEvidenceOptions(item).map((o) => o.text).filter((t) => !dipilih.includes(t));
+}
+function composeBukti(list, extra) {
+  const lines = list.map((t) => '- ' + t);
+  if (extra && String(extra).trim()) lines.push(String(extra).trim());
+  return lines.join('\n');
+}
+function composeTersedia(item, d) { return composeBukti(getBuktiTersediaPilih(item, d), d?.buktiTersedia); }
+function composePerlu(item, d) { return composeBukti(getBuktiPerluAuto(item, d), d?.buktiPerlu); }
 
 function calcBagianSkor(evidence, key) {
   let total = 0;
@@ -131,8 +180,8 @@ function buildReportHTML(school, evidence) {
           <td style="white-space:nowrap;font-weight:700">${escapeHtml(it.code)}</td>
           <td>${escapeHtml(it.name)}</td>
           <td style="text-align:center"><span class="badge" style="background:#${skorColor}1A;color:#${skorColor}">${skor === 0 ? 'Belum' : 'Skor ' + skor}</span></td>
-          <td>${escapeHtml(d.buktiTersedia)}</td>
-          <td>${escapeHtml(d.buktiPerlu)}</td>
+          <td>${escapeHtml(composeTersedia(it, d)).replace(/\n/g, '<br>')}</td>
+          <td>${escapeHtml(composePerlu(it, d)).replace(/\n/g, '<br>')}</td>
           <td>${escapeHtml(d.lokasi)}</td>
           <td>${escapeHtml(d.catatan)}</td>
         </tr>`;
@@ -238,7 +287,7 @@ function docxCell(text, width, opts = {}) {
     shading: opts.fill ? { type: ShadingType.CLEAR, fill: opts.fill } : undefined,
     verticalAlign: VerticalAlign.TOP,
     margins: { top: 60, bottom: 60, left: 80, right: 80 },
-    children: [new Paragraph({ alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT, children: [new TextRun({ text: text || '', size: 16, bold: !!opts.bold })] })],
+    children: String(text || '').split('\n').map((line) => new Paragraph({ alignment: opts.center ? AlignmentType.CENTER : AlignmentType.LEFT, children: [new TextRun({ text: line, size: 16, bold: !!opts.bold })] })),
   });
 }
 
@@ -277,7 +326,7 @@ async function buildReportDocx(school, evidence) {
       const rows = b.items.map((it) => {
         const d = evidence[it.code] || {};
         const skorTxt = d.skor ? 'Skor ' + d.skor : 'Belum';
-        return new DocxTableRow({ children: [docxCell(it.code, 8, { bold: true }), docxCell(it.name, 24), docxCell(skorTxt, 8, { center: true }), docxCell(d.buktiTersedia, 18), docxCell(d.buktiPerlu, 18), docxCell(d.lokasi, 12), docxCell(d.catatan, 12)] });
+        return new DocxTableRow({ children: [docxCell(it.code, 8, { bold: true }), docxCell(it.name, 24), docxCell(skorTxt, 8, { center: true }), docxCell(composeTersedia(it, d), 18), docxCell(composePerlu(it, d), 18), docxCell(d.lokasi, 12), docxCell(d.catatan, 12)] });
       });
       children.push(new DocxTable({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [header, ...rows] }));
       children.push(new Paragraph({ spacing: { after: 80 }, children: [] }));
@@ -353,7 +402,7 @@ function buildReportPdf(school, evidence) {
       const body = b.items.map((it) => {
         const d = evidence[it.code] || {};
         const skorTxt = d.skor ? 'Skor ' + d.skor : 'Belum';
-        return [it.code, it.name, skorTxt, d.buktiTersedia || '', d.buktiPerlu || '', d.lokasi || '', d.catatan || ''];
+        return [it.code, it.name, skorTxt, composeTersedia(it, d), composePerlu(it, d), d.lokasi || '', d.catatan || ''];
       });
       autoTable(docPdf, {
         startY,
@@ -655,12 +704,83 @@ function SkorPicker({ value, onChange }) {
 }
 
 /* =========================================================================
+   DROPDOWN BUKTI (centang banyak) berdasarkan panduan indikator
+   ========================================================================= */
+function BuktiDropdown({ options, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [open]);
+
+  const used = Array.isArray(selected);
+  const sel = used ? selected : [];
+  const groups = [];
+  options.forEach((o) => {
+    let g = groups.find((x) => x.name === o.group);
+    if (!g) { g = { name: o.group, items: [] }; groups.push(g); }
+    g.items.push(o.text);
+  });
+  const emit = (set) => onChange(options.map((o) => o.text).filter((t) => set.has(t)));
+  const toggle = (t) => {
+    const set = new Set(sel);
+    if (set.has(t)) set.delete(t); else set.add(t);
+    emit(set);
+  };
+
+  return (
+    <div ref={ref} className="relative mt-1">
+      <button
+        type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
+        className="w-full flex items-center justify-between gap-2 text-left text-base rounded-lg border border-slate-400 bg-white px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F3864]/30 focus:border-[#1F3864]"
+      >
+        <span className={used ? 'text-slate-900 font-semibold' : 'text-slate-500'}>
+          {used ? `${sel.length} dari ${options.length} bukti dicentang` : 'Pilih bukti yang sudah tersedia...'}
+        </span>
+        <ChevronDown size={16} className={`shrink-0 text-slate-600 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto rounded-lg border border-slate-300 bg-white shadow-lg">
+          <div className="sticky top-0 flex items-center gap-3 px-3 py-2 bg-slate-50 border-b border-slate-200 text-sm font-semibold">
+            <button type="button" onClick={() => emit(new Set(options.map((o) => o.text)))} className="text-[#0F6B5C] hover:underline">Pilih semua</button>
+            <button type="button" onClick={() => emit(new Set())} className="text-rose-600 hover:underline">Kosongkan</button>
+            <button type="button" onClick={() => setOpen(false)} className="ml-auto text-slate-600 hover:underline">Tutup</button>
+          </div>
+          {groups.map((g) => (
+            <div key={g.name}>
+              <p className="px-3 pt-2 pb-1 text-xs font-bold uppercase tracking-wide text-slate-500">{g.name}</p>
+              {g.items.map((t) => (
+                <label key={t} className="flex items-start gap-2 px-3 py-1.5 text-sm text-slate-800 hover:bg-[#F5F8FC] cursor-pointer">
+                  <input type="checkbox" checked={sel.includes(t)} onChange={() => toggle(t)} className="mt-0.5 w-4 h-4 shrink-0 accent-[#0F6B5C]" />
+                  <span>{t}</span>
+                </label>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================================
    KARTU INDIKATOR (input bukti dukung)
    ========================================================================= */
 function IndicatorCard({ item, data, onChange }) {
   const [showInfo, setShowInfo] = useState(false);
   const skor = data?.skor || 0;
   const filled = skor > 0;
+  const opsiBukti = getEvidenceOptions(item);
+  const pilihDipakai = Array.isArray(data?.buktiPilih);
+  const tersediaPilih = getBuktiTersediaPilih(item, data);
+  const perluAuto = getBuktiPerluAuto(item, data);
 
   return (
     <div className={`rounded-xl border bg-white transition-colors ${filled ? 'border-slate-400' : 'border-dashed border-slate-300'}`}>
@@ -722,18 +842,55 @@ function IndicatorCard({ item, data, onChange }) {
         <div className="grid sm:grid-cols-2 gap-2.5">
           <div>
             <label className="text-sm font-bold text-slate-700 uppercase tracking-wide">Bukti yang Sudah Tersedia</label>
+            {opsiBukti.length > 0 && (
+              <>
+                <BuktiDropdown options={opsiBukti} selected={data?.buktiPilih} onChange={(list) => onChange({ buktiPilih: list })} />
+                {tersediaPilih.length > 0 && (
+                  <ul className="mt-1.5 space-y-1">
+                    {tersediaPilih.map((t) => (
+                      <li key={t} className="flex items-start gap-1.5 text-sm text-emerald-900 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
+                        <Check size={13} className="mt-0.5 shrink-0" /><span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
             <textarea
               value={data?.buktiTersedia || ''} onChange={e => onChange({ buktiTersedia: e.target.value })}
-              rows={2} placeholder="Contoh: SK Tim TPPK, jurnal refleksi guru..."
-              className="mt-1 w-full text-base rounded-lg border border-slate-400 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F3864]/30 focus:border-[#1F3864] resize-none"
+              rows={2} placeholder="Bukti lain di luar daftar (opsional), mis. SK Tim TPPK..."
+              className="mt-1.5 w-full text-base rounded-lg border border-slate-400 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F3864]/30 focus:border-[#1F3864] resize-none"
             />
           </div>
           <div>
             <label className="text-sm font-bold text-slate-700 uppercase tracking-wide">Bukti yang Perlu Dilengkapi</label>
+            {opsiBukti.length > 0 && (
+              <div className="mt-1">
+                {!pilihDipakai && (
+                  <p className="text-sm text-slate-500 rounded-md border border-dashed border-slate-300 px-2 py-1.5">
+                    Terisi otomatis dari bukti yang belum dicentang pada kolom Bukti yang Sudah Tersedia.
+                  </p>
+                )}
+                {pilihDipakai && perluAuto.length === 0 && (
+                  <p className="text-sm text-emerald-800 font-semibold rounded-md bg-emerald-50 border border-emerald-200 px-2 py-1.5">
+                    Semua bukti pada panduan sudah dicentang.
+                  </p>
+                )}
+                {pilihDipakai && perluAuto.length > 0 && (
+                  <ul className="space-y-1">
+                    {perluAuto.map((t) => (
+                      <li key={t} className="flex items-start gap-1.5 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                        <AlertCircle size={13} className="mt-0.5 shrink-0" /><span>{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <textarea
               value={data?.buktiPerlu || ''} onChange={e => onChange({ buktiPerlu: e.target.value })}
-              rows={2} placeholder="Contoh: belum ada dokumentasi foto kegiatan..."
-              className="mt-1 w-full text-base rounded-lg border border-slate-400 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F3864]/30 focus:border-[#1F3864] resize-none"
+              rows={2} placeholder="Tambahan manual (opsional), mis. belum ada dokumentasi foto kegiatan..."
+              className="mt-1.5 w-full text-base rounded-lg border border-slate-400 px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-[#1F3864]/30 focus:border-[#1F3864] resize-none"
             />
           </div>
         </div>
